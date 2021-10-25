@@ -67,26 +67,19 @@ export default class GameController {
       [],
       this.gamePlay.boardSize
     );
-    this.generateTeamsPosition(this.humanTeams, this.skyNetTeams); // здесь работает...
-    /* this.humanPositions = getPositions(2, "human", this.gamePlay.boardSize); // позиции 'человеков'
-    this.skyNetPositions = getPositions(2, "skyNet", this.gamePlay.boardSize); // позиции ботов
-
-    this.humanTeamsWithPos = createTeamWithPos(this.humanTeams, this.humanPositions); // команда человеков с позициями
-    this.skyNetTeamsWithPos = createTeamWithPos(
-      this.skyNetTeams,
-      this.skyNetPositions
-    );
-
-    // команда ботов с позициями
-    this.players = [...this.humanTeamsWithPos, ...this.skyNetTeamsWithPos]; // объединенный массив игроков
-    console.log(this.players, 'players');
-    this.humanTurn = true; // ход игрока
-    this.gamePlay.redrawPositions(this.players);
-    */
+    this.generateTeamsPosition(this.humanTeams, this.skyNetTeams);
   }
 
   onNewGame() {
     this.prepareGame();
+  }
+
+  gameOver(arr1, arr2) {
+    if (!arr1.length) {
+      alert("You lose!");
+    } else if (!arr2.length) {
+      alert("You win!");
+    }
   }
 
   // Выделение персонажа
@@ -300,7 +293,18 @@ export default class GameController {
     }
 
     await this.endOfTurn(this.targetSkyNet, this.targetHuman);
+    
+    this.humanTeamsWithPos = this.filtredHealth(this.humanTeamsWithPos);
+    if(!this.humanTeamsWithPos.length){
+      
+      await this.gameOver(this.humanTeamsWithPos, this.skyNetTeamsWithPos);//alert блокирует анимацию и чистку поля
+
+    }else {
+    
     this.reverseOfTurn();
+    }
+
+   return
   }
 
   async endOfTurn(a, b) {
@@ -391,33 +395,11 @@ export default class GameController {
       );
     }
     if (this.currentLevel > 4) {
+      alert("Начните новую игру!");
+      this.onNewGame();
       return;
     }
-    // this.generateTeamsPosition(this.humanNewTeams,this.skyNetNewTeams);//если использую это - через раз появляктся ошибка(Uncaught (in promise) Error: position must be a number).
-    this.humanPositions = getPositions(
-      this.humanNewTeams.length,
-      "human",
-      this.gamePlay.boardSize
-    ); // позиции 'человеков'
-    this.skyNetPositions = getPositions(
-      this.skyNetNewTeams.length,
-      "skyNet",
-      this.gamePlay.boardSize
-    ); // позиции ботов
-
-    this.humanTeamsWithPos = createTeamWithPos(
-      this.humanNewTeams,
-      this.humanPositions
-    ); // команда человеков с позициями
-
-    this.skyNetTeamsWithPos = createTeamWithPos(
-      this.skyNetNewTeams,
-      this.skyNetPositions
-    );
-    // команда ботов с позициями
-    this.players = [...this.humanTeamsWithPos, ...this.skyNetTeamsWithPos]; // объединенный массив игроков
-    this.humanTurn = true; // ход игрока
-    this.gamePlay.redrawPositions(this.players);
+    this.generateTeamsPosition(this.humanNewTeams, this.skyNetNewTeams); //если использую это - через раз появляктся ошибка(Uncaught (in promise) Error: position must be a number).
   }
 
   levelUpgrade() {
@@ -441,8 +423,16 @@ export default class GameController {
   }
 
   generateTeamsPosition(a, b) {
-    this.humanPositions = getPositions(2, "human", this.gamePlay.boardSize); // позиции 'человеков'
-    this.skyNetPositions = getPositions(2, "skyNet", this.gamePlay.boardSize); // позиции ботов
+    this.humanPositions = getPositions(
+      a.length,
+      "human",
+      this.gamePlay.boardSize
+    ); // позиции 'человеков'
+    this.skyNetPositions = getPositions(
+      a.length,
+      "skyNet",
+      this.gamePlay.boardSize
+    ); // позиции ботов
 
     this.humanTeamsWithPos = createTeamWithPos(a, this.humanPositions); // команда человеков с позициями
     this.skyNetTeamsWithPos = createTeamWithPos(b, this.skyNetPositions);
@@ -452,4 +442,6 @@ export default class GameController {
     this.humanTurn = true; // ход игрока
     this.gamePlay.redrawPositions(this.players);
   }
+
+
 }
