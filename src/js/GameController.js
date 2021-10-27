@@ -26,6 +26,8 @@ import Undead from "./CharacterList/Undead";
 import Vampire from "./CharacterList/Vampire";
 import Daemon from "./CharacterList/Daemon";
 import Character from "./CharacterList/Character";
+import ControlBox from './ControlBox';
+
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -35,6 +37,7 @@ export default class GameController {
     this.selectedPlayer = null;
     this.selectedChar = undefined;
     this.currentTurn = "player";
+    this.record = 0;
   }
 
   init() {
@@ -68,10 +71,12 @@ export default class GameController {
       this.gamePlay.boardSize
     );
     this.generateTeamsPosition(this.humanTeams, this.skyNetTeams);
+    this.bindingBoxCount();
   }
 
   onNewGame() {
     this.prepareGame();
+    
   }
 
   gameOver(arr1, arr2) {
@@ -230,6 +235,9 @@ export default class GameController {
     if (!Object.keys(this.skyNetTeamsWithPos).length) {
       this.nextLevel(this.players);
       this.levelUpgrade();
+
+      if(this.currentLevel < 5) this.bindingBoxCount();
+      this.checkScores(this.humanTeamsWithPos);
     }
 
     const agregateArr = createActionArr(
@@ -396,7 +404,7 @@ export default class GameController {
     }
     if (this.currentLevel > 4) {
       alert("Начните новую игру!");
-      this.onNewGame();
+     
       return;
     }
     this.generateTeamsPosition(this.humanNewTeams, this.skyNetNewTeams); //если использую это - через раз появляктся ошибка(Uncaught (in promise) Error: position must be a number).
@@ -441,6 +449,30 @@ export default class GameController {
     console.log(this.players, "players");
     this.humanTurn = true; // ход игрока
     this.gamePlay.redrawPositions(this.players);
+  }
+
+  checkScores(survivor) {
+   
+    const healthArr = [];
+    survivor.forEach((el) => {
+       healthArr.push(el.character.health);
+    });
+    
+    this.scores = healthArr.reduce((sum, current) => {
+      return sum + current
+    },0);
+
+    if(this.record < this.scores)this.record = this.scores;
+   this.controlBox.showCount(this.currentLevel,this.scores,this.record);
+    
+    
+  }
+  bindingBoxCount(){
+    this.controlBox = new ControlBox(
+      document.querySelector(".board-container")
+    );
+    this.controlBox.redrawControlBox();
+
   }
 
 
