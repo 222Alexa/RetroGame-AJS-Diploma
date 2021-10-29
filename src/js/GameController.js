@@ -1,3 +1,12 @@
+/* Я случайно почти все доработала, но вопросы все равно есть)
+1.Завершение игры и timeKiller - очищать поле от персонажей или нет
+2. кривоватая у меня анимация, если честно, алерт ее блокирует.не придумать как сначала завершить анимацию и удаление игрока, а потом вывести алерт
+3. что делать с повышением уровня у ботов, пусть дефолтная атака/защита? или умножать им, если уровень бота выше 1?
+4. попытки научить ботов ходить дальше, чем на одну клетку пока безуспешны, хотя атака работает норм
+5. изменять  урон в зависимости от дистанции?
+6. тесты и сохранение очков после начала новой игры в процессе(это констатация)
+7. при игре из сохранения не работает nextLevel(). Видимо, потому что у меня разные обертки для свежих и сохраненных и я пока еще не придумала как это решить
+*/
 import themes from "./themes";
 import cursors from "./cursors";
 import PositionedCharacter from "./PositionedCharacter";
@@ -26,24 +35,27 @@ import Undead from "./CharacterList/Undead";
 import Vampire from "./CharacterList/Vampire";
 import Daemon from "./CharacterList/Daemon";
 import Character from "./CharacterList/Character";
-import ControlBox from './ControlBox';
-
+import ControlBox from "./ControlBox";
 
 export default class GameController {
   constructor(gamePlay, stateService) {
     this.gamePlay = gamePlay;
     this.stateService = stateService;
+    this.saveGame = undefined;
     this.char = null;
     this.selectedPlayer = null;
     this.selectedChar = undefined;
     this.currentTurn = "player";
+    this.scores = 0;
     this.record = 0;
   }
 
   init() {
     // TODO: add event listeners to gamePlay events
     // TODO: load saved stated from stateService
+
     this.prepareGame(); // подготовка игры
+
     this.gamePlay.addNewGameListener(this.onNewGame.bind(this));
     this.gamePlay.addSaveGameListener(this.onSaveGameClick.bind(this));
     this.gamePlay.addLoadGameListener(this.onLoadGameClick.bind(this));
@@ -54,39 +66,48 @@ export default class GameController {
   }
 
   prepareGame() {
-    this.currentLevel = 1;
-    this.gamePlay.drawUi(themes.prairie);
-    this.humanTeams = generateTeam(
-      new Team().humanType,
-      1,
-      2,
-      [],
-      this.gamePlay.boardSize
-    );
-    this.skyNetTeams = generateTeam(
-      new Team().skyNetType,
-      1,
-      2,
-      [],
-      this.gamePlay.boardSize
-    );
-    this.generateTeamsPosition(this.humanTeams, this.skyNetTeams);
+    if (this.saveGame) {
+      this.levelUpgrade();
+    } else {
+      this.currentLevel = 1;
+      this.gamePlay.drawUi(themes.prairie);
+      this.humanTeams = generateTeam(
+        new Team().humanType,
+        1,
+        2,
+        [],
+        this.gamePlay.boardSize
+      );
+      this.skyNetTeams = generateTeam(
+        new Team().skyNetType,
+        1,
+        2,
+        [],
+        this.gamePlay.boardSize
+      );
+      this.generateTeamsPosition(this.humanTeams, this.skyNetTeams);
+    }
+
+    this.players = [...this.humanTeamsWithPos, ...this.skyNetTeamsWithPos]; // объединенный массив игроков
+    this.gamePlay.redrawPositions(this.players);
+
     this.bindingBoxCount();
+    this.controlBox.showCount(this.currentLevel, this.scores, this.record);
   }
 
   onNewGame() {
-    this.prepareGame();
-    
-  }
+    this.char = null;
+    this.selectedPlayer = null;
+    this.selectedChar = undefined;
+    this.players = [];
+    this.scores = 0;
 
-  gameOver(arr1, arr2) {
-    if (!arr1.length) {
-      alert("You lose!");
-    } else if (!arr2.length) {
-      alert("You win!");
+    if (this.saveGame) {
+      this.saveGame = undefined;
     }
-  }
 
+    this.prepareGame();
+  }
   // Выделение персонажа
 
   onCellEnter(index) {
@@ -163,16 +184,30 @@ export default class GameController {
     // сохранение текущей игры
 
     this.state = {
-      players: this.players,
+      human: this.humanTeamsWithPos,
+      skyNet: this.skyNetTeamsWithPos,
+      level: this.currentLevel,
+      scores: this.scores,
+      record: this.record,
+      currentTurn: this.currentTurn,
     };
 
+    console.log(this.state);
     this.stateService.save(this.state);
     GamePlay.showMessage("Saved!");
   }
 
   onLoadGameClick() {
     if (this.state) {
-      console.log(GameState.from(this.stateService.load()), "GameState");
+      this.saveGame = this.stateService.load(this.state);
+      this.humanTeamsWithPos = this.saveGame.human;
+      this.skyNetTeamsWithPos = this.saveGame.skyNet;
+      this.currentLevel = this.saveGame.level;
+      this.scores = this.saveGame.scores;
+      this.record = this.saveGame.record;
+      this.players = [];
+      this.prepareGame();
+      console.log(this.currentLevel, "this.currentLevel");
     } else {
       GamePlay.showMessage("Нет сохраненных игр!");
     }
@@ -198,6 +233,7 @@ export default class GameController {
       this.char = this.selectedChar.character.type; // а это название персонажа
       this.gamePlay.selectCell(this.selectedChar.position);
     }
+
     if (this.selectedChar && !currentChar && this.step === true) {
       // если есть выделенный персонаж, клетка не занята и доступна для перемещения
       this.players.forEach((el) => this.gamePlay.deselectCell(el.position));
@@ -208,10 +244,6 @@ export default class GameController {
 
       this.reverseOfTurn();
       this.targetSkyNetChar();
-    }
-
-    if (this.selectedChar && !currentChar && this.step === false) {
-      console.log("далековато");
     }
 
     if (isSkyNetCell) {
@@ -230,14 +262,23 @@ export default class GameController {
 
   async targetSkyNetChar() {
     this.players.forEach((el) => this.gamePlay.deselectCell(el.position));
+    if (this.saveGame) {
+      this.humanTeamsWithPos = this.saveGame.human;
+      this.skyNetTeamsWithPos = this.saveGame.skyNet;
+    }
+
     this.skyNetTeamsWithPos = this.filtredHealth(this.skyNetTeamsWithPos);
     this.humanTeamsWithPos = this.filtredHealth(this.humanTeamsWithPos);
+
     if (!Object.keys(this.skyNetTeamsWithPos).length) {
+      this.checkScores(this.humanTeamsWithPos);
+      console.log(this.players, "play");
       this.nextLevel(this.players);
+
       this.levelUpgrade();
 
-      if(this.currentLevel < 5) this.bindingBoxCount();
-      this.checkScores(this.humanTeamsWithPos);
+      if (this.currentLevel < 5) this.bindingBoxCount();
+      this.controlBox.showCount(this.currentLevel, this.scores, this.record);
     }
 
     const agregateArr = createActionArr(
@@ -265,10 +306,7 @@ export default class GameController {
       if (!isEmptyCellsforStepArr.length) {
         return;
       }
-
-      this.targetSkyNet.position = isEmptyCellsforStepArr[1]; // здесь ошибка линтера prefer-destructuring, увеличила правила, тк не поняла как еще декомпозировать
-      console.log(isEmptyCellsforStepArr, "isEmptyCellsforStepArr");
-      console.log(isEmptyCellsforStepArr[1], "isEmptyCellsforStepArr");
+      this.targetSkyNet.position = isEmptyCellsforStepArr[1];
 
       this.gamePlay.redrawPositions(this.players);
       this.reverseOfTurn();
@@ -301,18 +339,13 @@ export default class GameController {
     }
 
     await this.endOfTurn(this.targetSkyNet, this.targetHuman);
-    
+
     this.humanTeamsWithPos = this.filtredHealth(this.humanTeamsWithPos);
-    if(!this.humanTeamsWithPos.length){
-      
-      await this.gameOver(this.humanTeamsWithPos, this.skyNetTeamsWithPos);//alert блокирует анимацию и чистку поля
-
-    }else {
-    
-    this.reverseOfTurn();
+    if (!this.humanTeamsWithPos.length) {
+      await this.gameOver(this.humanTeamsWithPos, this.skyNetTeamsWithPos); // alert блокирует анимацию и чистку поля
+    } else {
+      this.reverseOfTurn();
     }
-
-   return
   }
 
   async endOfTurn(a, b) {
@@ -326,16 +359,25 @@ export default class GameController {
     this.players.forEach((el) => this.gamePlay.deselectCell(el.position));
     this.players = this.filtredHealth(this.players);
 
-    this.selectedChar = null;
-    this.players.forEach((el) => this.gamePlay.deselectCell(el.position));
-
     this.gamePlay.redrawPositions(this.players);
   }
 
   reverseOfTurn() {
+    this.selectedChar = null; // перенести это в endOfTurne
+
+    this.players.forEach((el) => this.gamePlay.deselectCell(el.position)); // перенести это в endOfTurne
+
     if (this.currentTurn === "player") this.currentTurn = "skyNet";
     else {
       this.currentTurn === "player";
+    }
+  }
+
+  gameOver(arr1, arr2) {
+    if (!arr1.length) {
+      alert("You lose!");
+    } else if (!arr2.length) {
+      alert("You win!");
     }
   }
 
@@ -348,6 +390,7 @@ export default class GameController {
   }
 
   nextLevel(arr) {
+    console.log(this.humanTeamsWithPos, "this.humanTeamsWithPos");
     this.humanTeamsWithPos.forEach((elem) => elem.character.levelUp()); // повышение уровня выжившим
 
     this.survivor = []; // массив для выживших
@@ -372,6 +415,7 @@ export default class GameController {
         this.gamePlay.boardSize
       );
     }
+
     if (this.currentLevel === 3) {
       this.humanNewTeams = generateTeam(
         new Team().humanType,
@@ -387,6 +431,7 @@ export default class GameController {
         this.gamePlay.boardSize
       );
     }
+
     if (this.currentLevel === 4) {
       this.humanNewTeams = generateTeam(
         new Team().humanType,
@@ -402,16 +447,23 @@ export default class GameController {
         this.gamePlay.boardSize
       );
     }
+
     if (this.currentLevel > 4) {
-      alert("Начните новую игру!");
-     
+      this.currentLevel === 4;
+      this.gameOver(this.humanTeamsWithPos, this.skyNetTeamsWithPos);
       return;
     }
-    this.generateTeamsPosition(this.humanNewTeams, this.skyNetNewTeams); //если использую это - через раз появляктся ошибка(Uncaught (in promise) Error: position must be a number).
+
+    this.generateTeamsPosition(this.humanNewTeams, this.skyNetNewTeams);
+    this.players = [...this.humanTeamsWithPos, ...this.skyNetTeamsWithPos]; // объединенный массив игроков
+    this.gamePlay.redrawPositions(this.players);
   }
 
   levelUpgrade() {
     switch (this.currentLevel) {
+      case 1:
+        this.gamePlay.drawUi(themes.prairie);
+        break;
       case 2:
         this.gamePlay.drawUi(themes.desert);
         break;
@@ -444,36 +496,29 @@ export default class GameController {
 
     this.humanTeamsWithPos = createTeamWithPos(a, this.humanPositions); // команда человеков с позициями
     this.skyNetTeamsWithPos = createTeamWithPos(b, this.skyNetPositions);
-    // команда ботов с позициями
-    this.players = [...this.humanTeamsWithPos, ...this.skyNetTeamsWithPos]; // объединенный массив игроков
-    console.log(this.players, "players");
     this.humanTurn = true; // ход игрока
-    this.gamePlay.redrawPositions(this.players);
   }
 
   checkScores(survivor) {
-   
     const healthArr = [];
     survivor.forEach((el) => {
-       healthArr.push(el.character.health);
+      healthArr.push(el.character.health);
     });
-    
-    this.scores = healthArr.reduce((sum, current) => {
-      return sum + current
-    },0);
+    const scoresOfLevel = healthArr.reduce((sum, current) => {
+      return sum + current;
+    }, 0);
 
-    if(this.record < this.scores)this.record = this.scores;
-   this.controlBox.showCount(this.currentLevel,this.scores,this.record);
-    
-    
+    this.scores =
+      Number(this.controlBox.boxScoresEl.textContent) + scoresOfLevel;
+
+    if (this.record < this.scores) this.record = this.scores;
+    this.controlBox.showCount(this.currentLevel, this.scores, this.record);
   }
-  bindingBoxCount(){
+
+  bindingBoxCount() {
     this.controlBox = new ControlBox(
       document.querySelector(".board-container")
     );
     this.controlBox.redrawControlBox();
-
   }
-
-
 }

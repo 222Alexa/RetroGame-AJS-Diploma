@@ -26,7 +26,7 @@ export default class ControlBox {
 
   redrawControlBox() {
     this.parentEl.insertAdjacentHTML("afterend", this.constructor.markup);
-    console.log('!!!')
+    console.log("!!!");
   }
 
   showCount(level, scores, record) {

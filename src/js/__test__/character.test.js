@@ -72,7 +72,7 @@ test("levelUp() корректно повышает уровень и health", (
     type: "bowman",
     health: 100,
     level: 3,
-    attack: 25,
-    deffence: 25,
+    attack: 38,
+    deffence: 38,
   });
 });

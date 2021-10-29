@@ -12,29 +12,21 @@ export default class Character {
   }
 
   levelUp() {
+    // работает изменение атаки и защиты
     this.level += 1;
+
+    this.attack = Math.round(
+      Math.max(this.attack, (this.attack * (180 - this.health)) / 100)
+    );
+
+    this.deffence = Math.round(
+      Math.max(this.deffence, (this.deffence * (180 - this.health)) / 100)
+    );
+
     this.health += 80;
+
     if (this.health > 100) {
       this.health = 100;
     }
-    this.attack = Math.max(
-      this.attack,
-      (this.attack * (180 - this.health)) / 100
-    ); // не работает изменение атаки и защиты
-    this.deffence = Math.max(
-      this.deffence,
-      (this.deffence * (180 - this.health)) / 100
-    );
   }
-
-  /* damage(points) {
-      if (this.health > 0) {
-        this.health -= points * (1 - this.deffence / 100);
-        // console.log('Не сегодня!');
-      }
-      if (this.health < 0) {
-        this.health = 0;
-        // console.log('Game over!');
-      }
-    } */
 }
